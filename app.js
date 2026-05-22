@@ -89,7 +89,13 @@ animeModeBtn.addEventListener("click", () => {
 // Servers configuration
 const SERVERS = [
   {
-    name: "Vidrock (Default)",
+    name: "Zenith (Default)",
+    id: "zenith",
+    getMovieUrl: (id) => `https://movie-scraper-puce.vercel.app/?id=${id}`,
+    getTvUrl: (id, s, e) => `https://movie-scraper-puce.vercel.app/?id=${id}&s=${s}&e=${e}`,
+  },
+  {
+    name: "Vidrock",
     id: "vidrock",
     getMovieUrl: (id) => `https://vidrock.ru/movie/${id}?theme=E50914`,
     getTvUrl: (id, s, e) =>
