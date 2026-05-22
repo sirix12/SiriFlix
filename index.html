@@ -89,9 +89,12 @@
       <div class="player-wrapper">
         <iframe
           id="video-player"
-          allowfullscreen
+          allowfullscreen="true"
+          webkitallowfullscreen="true"
+          mozallowfullscreen="true"
+          allow="autoplay; fullscreen"
+          referrerpolicy="origin"
           frameborder="0"
-          sandbox="allow-scripts allow-same-origin allow-presentation"
         ></iframe>
       </div>
 

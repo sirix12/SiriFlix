@@ -3,6 +3,32 @@ const BASE_URL = "https://api.themoviedb.org/3";
 const IMG_URL = "https://image.tmdb.org/t/p/w500";
 const BG_IMG_URL = "https://image.tmdb.org/t/p/original";
 
+// --- Anti-Ad & Popup Blocking Tricks ---
+// 1. Override window.open to prevent JS-based popups on the main site
+window.open = function () {
+  console.warn("Blocked popup attempt via window.open");
+  return null;
+};
+
+// 2. Intercept clicks on links that try to open in new tabs
+document.addEventListener("click", function (e) {
+  const target = e.target.closest("a");
+  if (target && target.getAttribute("target") === "_blank") {
+    e.preventDefault();
+    console.warn("Blocked new tab link click");
+  }
+});
+
+// 3. Warn user if a script tries to redirect the entire page (Top Navigation Hijacking)
+window.addEventListener("beforeunload", (e) => {
+  if (document.activeElement && document.activeElement.tagName === "IFRAME") {
+    // If an iframe is trying to redirect the page while active, warn the user
+    // Modern browsers ignore custom messages, so we just call preventDefault()
+    e.preventDefault();
+  }
+});
+// ---------------------------------------
+
 // DOM Elements
 const navbar = document.getElementById("navbar");
 const searchInput = document.getElementById("search-input");
@@ -142,6 +168,7 @@ const SERVERS = [
 
 // Initialize Servers
 function initServers() {
+  serverSelect.innerHTML = "";
   SERVERS.forEach((server) => {
     const option = document.createElement("option");
     option.value = server.id;
@@ -351,23 +378,23 @@ async function performSearch(query) {
     data.data.forEach((item) => {
       const posterUrl = item.poster || item.image;
       if (!posterUrl) return;
-      
+
       const itemDiv = document.createElement("div");
       itemDiv.classList.add("search-result-item");
       itemDiv.onclick = () => openPlayer(item);
-      
+
       const img = document.createElement("img");
       img.src = posterUrl;
       img.classList.add("poster");
       img.alt = item.title;
-      
+
       const title = document.createElement("div");
       title.classList.add("search-result-title");
       title.innerText = item.title || "Unknown Title";
-      
+
       itemDiv.appendChild(img);
       itemDiv.appendChild(title);
-      
+
       item.media_type = "anime";
       searchResultsGrid.appendChild(itemDiv);
     });
@@ -384,23 +411,23 @@ async function performSearch(query) {
 
     data.results.forEach((item) => {
       if (!item.poster_path || item.media_type === "person") return;
-      
+
       const itemDiv = document.createElement("div");
       itemDiv.classList.add("search-result-item");
       itemDiv.onclick = () => openPlayer(item);
-      
+
       const img = document.createElement("img");
       img.src = IMG_URL + item.poster_path;
       img.classList.add("poster");
       img.alt = item.title || item.name;
-      
+
       const title = document.createElement("div");
       title.classList.add("search-result-title");
       title.innerText = item.title || item.name || "Unknown Title";
-      
+
       itemDiv.appendChild(img);
       itemDiv.appendChild(title);
-      
+
       searchResultsGrid.appendChild(itemDiv);
     });
   }
@@ -415,7 +442,7 @@ async function openPlayer(item) {
     detailsTitle.innerText = "Finding streams...";
     try {
       let searchRes = await fetchData(`${ANIME_API_URL}/search?q=${encodeURIComponent(item.title)}`);
-      
+
       if ((!searchRes || !searchRes.data || searchRes.data.length === 0) && item.altTitle) {
         searchRes = await fetchData(`${ANIME_API_URL}/search?q=${encodeURIComponent(item.altTitle)}`);
       }
@@ -447,12 +474,12 @@ async function openPlayer(item) {
 
   // Save where we came from to go back
   previousView = "main";
-  
+
   // Push state for browser back button
   if (window.location.hash !== "#details") {
     history.pushState({ view: "details" }, "", "#details");
   }
-  
+
   // Show details view immediately to avoid perceived delay
   mainView.classList.add("hidden");
   searchPopup.classList.add("hidden");
@@ -469,6 +496,9 @@ async function openPlayer(item) {
 
   // Reset controls
   serverSelect.selectedIndex = 0; // Default to Vidrock
+  seasonSelect.innerHTML = "";
+  episodeSelect.innerHTML = "";
+  animeResolutionSelect.innerHTML = "";
 
   if (type === "anime") {
     const details = await fetchData(`${ANIME_API_URL}/${item.session}`);
@@ -543,6 +573,8 @@ window.addEventListener("popstate", () => {
 backBtn.onclick = backToHome;
 
 async function loadTvSeasons(id) {
+  seasonSelect.innerHTML = "<option>Loading seasons...</option>";
+  episodeSelect.innerHTML = "<option>Loading episodes...</option>";
   const data = await fetchData(`${BASE_URL}/tv/${id}?api_key=${API_KEY}`);
   seasonSelect.innerHTML = "";
 
@@ -569,6 +601,7 @@ async function loadTvSeasons(id) {
 }
 
 async function loadTvEpisodes(tvId, seasonNumber, defaultEpisode = 1) {
+  episodeSelect.innerHTML = "<option>Loading episodes...</option>";
   const data = await fetchData(
     `${BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${API_KEY}`,
   );
