@@ -194,24 +194,30 @@ async function fetchData(url) {
 async function loadHome() {
   initServers();
 
+  rowsContainer.innerHTML = "";
+  heroTitle.innerText = "Loading...";
+  heroOverview.innerText = "";
+  hero.style.backgroundImage = "none";
+
   if (isAnimeMode) {
     // Fetch Airing Anime
-    const airing = await fetchData(`${ANIME_API_URL}/airing`);
-    if (airing && airing.data && airing.data.length > 0) {
-      const heroAnime =
-        airing.data[Math.floor(Math.random() * airing.data.length)];
+    fetchData(`${ANIME_API_URL}/airing`).then((airing) => {
+      if (airing && airing.data && airing.data.length > 0) {
+        const heroAnime =
+          airing.data[Math.floor(Math.random() * airing.data.length)];
 
-      heroTitle.innerText = heroAnime.title;
-      heroOverview.innerText = "Currently airing episode " + heroAnime.episode;
-      hero.style.backgroundImage = `url(${heroAnime.image || heroAnime.poster})`;
+        heroTitle.innerText = heroAnime.title;
+        heroOverview.innerText = "Currently airing episode " + heroAnime.episode;
+        hero.style.backgroundImage = `url(${heroAnime.image || heroAnime.poster})`;
 
-      heroAnime.media_type = "anime";
+        heroAnime.media_type = "anime";
 
-      document.getElementById("hero-play").onclick = () =>
-        openPlayer(heroAnime);
-      document.getElementById("hero-info").onclick = () =>
-        openPlayer(heroAnime);
-    }
+        document.getElementById("hero-play").onclick = () =>
+          openPlayer(heroAnime);
+        document.getElementById("hero-info").onclick = () =>
+          openPlayer(heroAnime);
+      }
+    }).catch(err => console.error(err));
 
     const rows = [
       { title: "Top Anime This Season", url: `https://api.jikan.moe/v4/seasons/now?limit=20`, isJikan: true },
@@ -221,48 +227,61 @@ async function loadHome() {
       { title: "Top Romance", url: `https://api.jikan.moe/v4/anime?genres=22&order_by=score&sort=desc&limit=20`, isJikan: true },
     ];
 
-    rowsContainer.innerHTML = "";
+    const rowElements = rows.map(row => {
+      const rowDiv = document.createElement("div");
+      rowDiv.classList.add("row");
+      const h2 = document.createElement("h2");
+      h2.innerText = row.title;
+      rowDiv.appendChild(h2);
+      const postersDiv = document.createElement("div");
+      postersDiv.classList.add("row-posters");
+      rowDiv.appendChild(postersDiv);
+      rowsContainer.appendChild(rowDiv);
+      return postersDiv;
+    });
 
-    for (const row of rows) {
-      try {
-        const rowData = await fetchData(row.url);
-        if (rowData && rowData.data) {
-          let mappedData = rowData.data;
-          if (row.isJikan) {
-            mappedData = rowData.data.map(anime => ({
-              title: anime.title,
-              altTitle: anime.title_english,
-              image: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url,
-              synopsis: anime.synopsis,
-              year: anime.year,
-              score: anime.score,
-              id: anime.mal_id
-            }));
+    (async () => {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          const rowData = await fetchData(row.url);
+          if (rowData && rowData.data) {
+            let mappedData = rowData.data;
+            if (row.isJikan) {
+              mappedData = rowData.data.map(anime => ({
+                title: anime.title,
+                altTitle: anime.title_english,
+                image: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url,
+                synopsis: anime.synopsis,
+                year: anime.year,
+                score: anime.score,
+                id: anime.mal_id
+              }));
+            }
+            populatePosters(rowElements[i], mappedData, true);
           }
-          createRow(row.title, mappedData, true);
+          if (row.isJikan) {
+            await new Promise(r => setTimeout(r, 400));
+          }
+        } catch (err) {
+          console.error(`Error fetching ${row.title}:`, err);
         }
-        if (row.isJikan) {
-          await new Promise(r => setTimeout(r, 400));
-        }
-      } catch (err) {
-        console.error(`Error fetching ${row.title}:`, err);
       }
-    }
+    })();
   } else {
     // Fetch Trending
-    const trending = await fetchData(
-      `${BASE_URL}/trending/all/day?api_key=${API_KEY}`,
-    );
-    const heroMovie =
-      trending.results[Math.floor(Math.random() * trending.results.length)];
+    fetchData(`${BASE_URL}/trending/all/day?api_key=${API_KEY}`).then((trending) => {
+      const heroMovie =
+        trending.results[Math.floor(Math.random() * trending.results.length)];
 
-    // Set Hero
-    heroTitle.innerText = heroMovie.title || heroMovie.name;
-    heroOverview.innerText = heroMovie.overview;
-    hero.style.backgroundImage = `url(${BG_IMG_URL + heroMovie.backdrop_path})`;
+      // Set Hero
+      heroTitle.innerText = heroMovie.title || heroMovie.name;
+      heroOverview.innerText = heroMovie.overview;
+      hero.style.backgroundImage = `url(${BG_IMG_URL + heroMovie.backdrop_path})`;
 
-    document.getElementById("hero-play").onclick = () => openPlayer(heroMovie);
-    document.getElementById("hero-info").onclick = () => openPlayer(heroMovie); // Can be a different modal later
+      document.getElementById("hero-play").onclick = () => openPlayer(heroMovie);
+      document.getElementById("hero-info").onclick = () => openPlayer(heroMovie); // Can be a different modal later
+    }).catch(err => console.error(err));
 
     // Load Rows
     const rows = [
@@ -283,26 +302,28 @@ async function loadHome() {
       },
     ];
 
-    rowsContainer.innerHTML = "";
+    const rowElements = rows.map(row => {
+      const rowDiv = document.createElement("div");
+      rowDiv.classList.add("row");
+      const h2 = document.createElement("h2");
+      h2.innerText = row.title;
+      rowDiv.appendChild(h2);
+      const postersDiv = document.createElement("div");
+      postersDiv.classList.add("row-posters");
+      rowDiv.appendChild(postersDiv);
+      rowsContainer.appendChild(rowDiv);
+      return postersDiv;
+    });
 
-    for (const row of rows) {
-      const rowData = await fetchData(BASE_URL + row.url);
-      createRow(row.title, rowData.results, false);
-    }
+    rows.forEach((row, i) => {
+      fetchData(BASE_URL + row.url).then((rowData) => {
+        populatePosters(rowElements[i], rowData.results, false);
+      }).catch(err => console.error(err));
+    });
   }
 }
 
-function createRow(title, items, isAnime = false) {
-  const rowDiv = document.createElement("div");
-  rowDiv.classList.add("row");
-
-  const h2 = document.createElement("h2");
-  h2.innerText = title;
-  rowDiv.appendChild(h2);
-
-  const postersDiv = document.createElement("div");
-  postersDiv.classList.add("row-posters");
-
+function populatePosters(postersDiv, items, isAnime = false) {
   items.forEach((item) => {
     const posterUrl = isAnime
       ? item.poster || item.image
@@ -332,9 +353,6 @@ function createRow(title, items, isAnime = false) {
 
     postersDiv.appendChild(itemDiv);
   });
-
-  rowDiv.appendChild(postersDiv);
-  rowsContainer.appendChild(rowDiv);
 }
 
 // Search Functionality
