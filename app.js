@@ -43,8 +43,19 @@ const rowsContainer = document.getElementById("rows-container");
 
 const detailsView = document.getElementById("details-view");
 const backBtn = document.getElementById("back-btn");
-const videoPlayer = document.getElementById("video-player");
+let videoPlayer = document.getElementById("video-player");
 const serverSelect = document.getElementById("server-select");
+
+function setVideoPlayerSrc(url) {
+  const newIframe = videoPlayer.cloneNode(true);
+  if (url) {
+    newIframe.src = url;
+  } else {
+    newIframe.removeAttribute("src");
+  }
+  videoPlayer.parentNode.replaceChild(newIframe, videoPlayer);
+  videoPlayer = newIframe;
+}
 const tvControls = document.getElementById("tv-controls");
 const seasonSelect = document.getElementById("season-select");
 const episodeSelect = document.getElementById("episode-select");
@@ -66,6 +77,8 @@ let currentMedia = null; // { id, type: 'movie' | 'tv' | 'anime', session }
 let previousView = "main"; // Tracks if user came from 'main' or 'search'
 let isAnimeMode = false;
 let currentAnimeSources = [];
+let watchStartTime = 0;
+let videoProgress = 0;
 const ANIME_API_URL = "https://animepahe-api.vercel.app/api";
 
 moviesModeBtn.addEventListener("click", () => {
@@ -198,6 +211,47 @@ async function loadHome() {
   heroTitle.innerText = "Loading...";
   heroOverview.innerText = "";
   hero.style.backgroundImage = "none";
+
+  // Continue Watching Section
+  const cwData = JSON.parse(localStorage.getItem('continueWatching') || '[]');
+  const filteredCwData = cwData.filter(entry => isAnimeMode ? entry.type === 'anime' : entry.type !== 'anime');
+  
+  if (filteredCwData.length > 0) {
+    const rowDiv = document.createElement("div");
+    rowDiv.classList.add("row");
+    const h2 = document.createElement("h2");
+    h2.innerText = "Continue Watching";
+    rowDiv.appendChild(h2);
+    const postersDiv = document.createElement("div");
+    postersDiv.classList.add("row-posters");
+    rowDiv.appendChild(postersDiv);
+    rowsContainer.appendChild(rowDiv);
+    
+    filteredCwData.forEach(entry => {
+      const itemDiv = document.createElement("div");
+      itemDiv.classList.add("row-item");
+      itemDiv.onclick = () => openPlayer(entry.item);
+
+      const img = document.createElement("img");
+      img.src = entry.poster;
+      img.classList.add("poster");
+      img.alt = entry.title;
+
+      const title = document.createElement("div");
+      title.classList.add("row-item-title");
+      let subText = "";
+      if (entry.type === 'tv' && entry.season && entry.episode) {
+        subText = ` (S${entry.season} E${entry.episode})`;
+      } else if (entry.type === 'anime') {
+        subText = ` (Resuming)`;
+      }
+      title.innerText = entry.title + subText;
+
+      itemDiv.appendChild(img);
+      itemDiv.appendChild(title);
+      postersDiv.appendChild(itemDiv);
+    });
+  }
 
   if (isAnimeMode) {
     // Fetch Airing Anime
@@ -494,6 +548,7 @@ async function openPlayer(item) {
     id: item.id || item.session,
     type: type,
     session: item.session,
+    item: item,
   };
 
   // Save where we came from to go back
@@ -516,7 +571,7 @@ async function openPlayer(item) {
   detailsYear.innerText = "";
   detailsRating.innerText = "";
   detailsType.innerText = type.toUpperCase();
-  videoPlayer.src = ""; // Clear previous video
+  setVideoPlayerSrc(""); // Clear previous video
 
   // Reset controls
   serverSelect.selectedIndex = 0; // Default to Vidrock
@@ -572,12 +627,17 @@ async function openPlayer(item) {
 }
 
 function closeDetailsView() {
+  saveFinalProgress();
   detailsView.classList.add("hidden");
-  videoPlayer.src = ""; // Stop video playback
+  setVideoPlayerSrc(""); // Stop video playback
   currentMedia = null;
 
   mainView.classList.remove("hidden");
   window.scrollTo(0, 0);
+  
+  if (window.location.hash !== "#details") {
+    loadHome(); // Refresh home to update Continue Watching row
+  }
 }
 
 function backToHome() {
@@ -604,10 +664,14 @@ async function loadTvSeasons(id) {
 
   // Fetch last watched episode from local storage if available
   let savedWatchProgress = getSavedProgress(id);
+  let cwProgress = JSON.parse(localStorage.getItem('continueWatching') || '[]').find(p => p.id === id);
   let defaultSeason = 1;
   let defaultEpisode = 1;
 
-  if (savedWatchProgress && savedWatchProgress.last_season_watched) {
+  if (cwProgress && cwProgress.season) {
+    defaultSeason = parseInt(cwProgress.season);
+    defaultEpisode = parseInt(cwProgress.episode);
+  } else if (savedWatchProgress && savedWatchProgress.last_season_watched) {
     defaultSeason = parseInt(savedWatchProgress.last_season_watched);
     defaultEpisode = parseInt(savedWatchProgress.last_episode_watched);
   }
@@ -649,6 +713,7 @@ seasonSelect.addEventListener("change", () => {
 });
 
 episodeSelect.addEventListener("change", () => {
+  saveFinalProgress();
   if (currentMedia && currentMedia.type === "anime") {
     updateAnimePlayerSrc();
   } else {
@@ -667,7 +732,7 @@ animeResolutionSelect.addEventListener("change", () => {
       currentAnimeSources.find((s) => s.resolution === selectedRes) ||
       currentAnimeSources[0];
     if (source && source.embed) {
-      videoPlayer.src = source.embed;
+      setVideoPlayerSrc(source.embed);
     }
   }
 });
@@ -683,10 +748,14 @@ function updatePlayerSrc() {
   if (currentMedia.type === "tv") {
     const s = seasonSelect.value;
     const e = episodeSelect.value;
-    videoPlayer.src = server.getTvUrl(currentMedia.id, s, e);
+    setVideoPlayerSrc(server.getTvUrl(currentMedia.id, s, e));
   } else {
-    videoPlayer.src = server.getMovieUrl(currentMedia.id);
+    setVideoPlayerSrc(server.getMovieUrl(currentMedia.id));
   }
+  
+  watchStartTime = Date.now();
+  videoProgress = 0;
+  updateContinueWatching();
 }
 
 async function loadAnimeEpisodes(session) {
@@ -727,6 +796,14 @@ async function loadAnimeEpisodes(session) {
       episodeSelect.appendChild(option);
     });
 
+    let cwProgress = JSON.parse(localStorage.getItem('continueWatching') || '[]').find(p => p.id === session);
+    if (cwProgress && cwProgress.episode) {
+      const optionExists = Array.from(episodeSelect.options).some(opt => opt.value === cwProgress.episode);
+      if (optionExists) {
+        episodeSelect.value = cwProgress.episode;
+      }
+    }
+
     updateAnimePlayerSrc();
   } else {
     episodeSelect.innerHTML = "<option>No episodes found</option>";
@@ -765,9 +842,13 @@ async function updateAnimePlayerSrc() {
     if (bestSource) {
       animeResolutionSelect.value = bestSource.resolution;
       if (bestSource.embed) {
-        videoPlayer.src = bestSource.embed;
+        setVideoPlayerSrc(bestSource.embed);
       }
     }
+    
+    watchStartTime = Date.now();
+    videoProgress = 0;
+    updateContinueWatching();
   } else {
     currentAnimeSources = [];
     animeResolutionSelect.innerHTML = "<option>No resolutions</option>";
@@ -817,6 +898,77 @@ function getSavedProgress(tmdbId) {
     return null;
   }
 }
+
+function updateContinueWatching() {
+  if (!currentMedia || !currentMedia.item) return;
+  const cw = JSON.parse(localStorage.getItem('continueWatching') || '[]');
+  
+  let posterUrl = currentMedia.item.poster || currentMedia.item.image || (currentMedia.item.poster_path ? IMG_URL + currentMedia.item.poster_path : null) || (currentMedia.item.backdrop_path ? BG_IMG_URL + currentMedia.item.backdrop_path : null);
+  
+  if (!posterUrl) {
+    posterUrl = "https://via.placeholder.com/500x750?text=No+Image";
+  }
+  
+  const entry = {
+    id: currentMedia.id,
+    type: currentMedia.type,
+    session: currentMedia.session,
+    item: currentMedia.item,
+    season: currentMedia.type === 'tv' ? seasonSelect.value : null,
+    episode: currentMedia.type === 'tv' || currentMedia.type === 'anime' ? episodeSelect.value : null,
+    title: detailsTitle.innerText || currentMedia.item.title || currentMedia.item.name || "Unknown Title",
+    poster: posterUrl,
+    timestamp: Date.now()
+  };
+
+  const existingIndex = cw.findIndex(item => item.id === entry.id);
+  if (existingIndex >= 0) {
+    cw[existingIndex] = entry;
+  } else {
+    cw.unshift(entry);
+  }
+  
+  cw.sort((a, b) => b.timestamp - a.timestamp);
+  if (cw.length > 15) cw.pop();
+  
+  localStorage.setItem('continueWatching', JSON.stringify(cw));
+}
+
+function saveFinalProgress() {
+  if (!currentMedia || !currentMedia.item || !watchStartTime) return;
+  
+  const timeSpent = Date.now() - watchStartTime;
+  let finalProgress = videoProgress;
+  
+  // Calculate progress based on time spent if not set by video events
+  if (finalProgress === 0 && timeSpent > 0) {
+    // Estimate: 24 mins for anime, 45 mins for TV
+    const estimatedDuration = (currentMedia.type === 'anime') ? 24 * 60 * 1000 : 45 * 60 * 1000;
+    finalProgress = timeSpent / estimatedDuration;
+  }
+  
+  // If more than 70% completed, move to next episode
+  if (finalProgress >= 0.7) {
+    const currentIndex = episodeSelect.selectedIndex;
+    if (currentIndex >= 0 && currentIndex < episodeSelect.options.length - 1) {
+      const nextOption = episodeSelect.options[currentIndex + 1];
+      
+      const cw = JSON.parse(localStorage.getItem('continueWatching') || '[]');
+      const existingIndex = cw.findIndex(item => item.id === currentMedia.id);
+      if (existingIndex >= 0) {
+        cw[existingIndex].episode = nextOption.value;
+        localStorage.setItem('continueWatching', JSON.stringify(cw));
+      }
+    }
+  }
+  
+  watchStartTime = 0;
+  videoProgress = 0;
+}
+
+window.addEventListener("beforeunload", () => {
+  saveFinalProgress();
+});
 
 // Initialize
 if (window.location.hash === "#details") {
