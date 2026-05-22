@@ -1,101 +1,137 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SiriFlix - Watch TV Shows Online, Watch Movies Online</title>
-    <meta name="description" content="SiriFlix is the leading streaming service to watch free movies and TV shows online.">
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body>
+    <meta
+      name="description"
+      content="SiriFlix is the leading streaming service to watch free movies and TV shows online."
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </head>
+  <body>
     <!-- Navbar -->
     <header id="navbar" class="navbar">
-        <div class="nav-left">
-            <a href="index.html" style="text-decoration: none;"><h1 class="logo">SiriFlix</h1></a>
+      <div class="nav-left">
+        <a href="index.html" style="text-decoration: none"
+          ><h1 class="logo">SiriFlix</h1></a
+        >
+      </div>
+      <div class="nav-right">
+        <div class="mode-toggle">
+          <span id="movies-mode-btn" class="mode-btn active">Movies/TV</span>
+          <span id="anime-mode-btn" class="mode-btn">Anime</span>
         </div>
-        <div class="nav-right">
-            <div class="search-container">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="search-input" placeholder="Titles, people, genres">
-            </div>
-            <div class="profile">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" alt="Profile">
-            </div>
+        <div class="search-container">
+          <i class="fas fa-search search-icon"></i>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Titles, people, genres"
+          />
+          <!-- Search Popup -->
+          <div id="search-popup" class="search-popup hidden">
+            <div id="search-results-grid" class="popup-grid"></div>
+          </div>
         </div>
+        <div class="profile">
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"
+            alt="Profile"
+          />
+        </div>
+      </div>
     </header>
 
-    <!-- Search Results View (Hidden by default) -->
-    <section id="search-view" class="search-view hidden">
-        <h2>Search Results for <span id="search-term"></span></h2>
-        <div id="search-results-grid" class="grid-container"></div>
-    </section>
 
     <!-- Main Content View -->
     <main id="main-view">
-        <!-- Hero Section -->
-        <section id="hero" class="hero">
-            <div class="hero-content">
-                <h1 id="hero-title" class="hero-title">Loading...</h1>
-                <p id="hero-overview" class="hero-overview"></p>
-                <div class="hero-buttons">
-                    <button id="hero-play" class="btn btn-play"><i class="fas fa-play"></i> Play</button>
-                    <button id="hero-info" class="btn btn-info"><i class="fas fa-info-circle"></i> More Info</button>
-                </div>
-            </div>
-            <div class="hero-fade-bottom"></div>
-        </section>
-
-        <!-- Content Rows -->
-        <div id="rows-container" class="rows-container">
-            <!-- Rows will be injected here via JS -->
+      <!-- Hero Section -->
+      <section id="hero" class="hero">
+        <div class="hero-content">
+          <h1 id="hero-title" class="hero-title">Loading...</h1>
+          <p id="hero-overview" class="hero-overview"></p>
+          <div class="hero-buttons">
+            <button id="hero-play" class="btn btn-play">
+              <i class="fas fa-play"></i> Play
+            </button>
+            <button id="hero-info" class="btn btn-info">
+              <i class="fas fa-info-circle"></i> More Info
+            </button>
+          </div>
         </div>
+        <div class="hero-fade-bottom"></div>
+      </section>
+
+      <!-- Content Rows -->
+      <div id="rows-container" class="rows-container">
+        <!-- Rows will be injected here via JS -->
+      </div>
     </main>
 
     <!-- Player / Details View (Hidden by default) -->
     <section id="details-view" class="details-view hidden">
-        <div class="details-header">
-            <button id="back-btn" class="btn btn-back"><i class="fas fa-arrow-left"></i> Back</button>
-        </div>
-        
-        <div class="player-wrapper">
-            <iframe id="video-player" allowfullscreen frameborder="0" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+      <div class="details-header">
+        <button id="back-btn" class="btn btn-back">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+
+      <div class="player-wrapper">
+        <iframe
+          id="video-player"
+          allowfullscreen
+          frameborder="0"
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+        ></iframe>
+      </div>
+
+      <div class="details-content">
+        <div class="controls-bar">
+          <div class="server-selection">
+            <label for="server-select">Server: </label>
+            <select id="server-select" class="dropdown">
+              <!-- Servers will be populated by JS -->
+            </select>
+          </div>
+
+          <div id="tv-controls" class="tv-controls hidden">
+            <select id="season-select" class="dropdown"></select>
+            <select id="episode-select" class="dropdown"></select>
+            <select
+              id="anime-resolution-select"
+              class="dropdown hidden"
+            ></select>
+          </div>
         </div>
 
-        <div class="details-content">
-            <div class="controls-bar">
-                <div class="server-selection">
-                    <label for="server-select">Server: </label>
-                    <select id="server-select" class="dropdown">
-                        <!-- Servers will be populated by JS -->
-                    </select>
-                </div>
-
-                <div id="tv-controls" class="tv-controls hidden">
-                    <select id="season-select" class="dropdown"></select>
-                    <select id="episode-select" class="dropdown"></select>
-                </div>
-            </div>
-
-            <div class="info-section">
-                <h1 id="details-title">Title</h1>
-                <div class="meta-data">
-                    <span id="details-year" class="year"></span>
-                    <span id="details-rating" class="rating"></span>
-                    <span id="details-type" class="type"></span>
-                </div>
-                <p id="details-overview" class="overview"></p>
-            </div>
+        <div class="info-section">
+          <h1 id="details-title">Title</h1>
+          <div class="meta-data">
+            <span id="details-year" class="year"></span>
+            <span id="details-rating" class="rating"></span>
+            <span id="details-type" class="type"></span>
+          </div>
+          <p id="details-overview" class="overview"></p>
         </div>
+      </div>
     </section>
 
     <!-- Continue Watching Floating Widget (Optional but good for quick access) -->
     <div id="continue-watching-widget" class="cw-widget hidden">
-        <h4>Continue Watching</h4>
-        <div id="cw-list" class="cw-list"></div>
+      <h4>Continue Watching</h4>
+      <div id="cw-list" class="cw-list"></div>
     </div>
 
     <script src="app.js"></script>
-</body>
+  </body>
 </html>
