@@ -86,6 +86,17 @@ moviesModeBtn.addEventListener("click", () => {
     isAnimeMode = false;
     animeModeBtn.classList.remove("active");
     moviesModeBtn.classList.add("active");
+    // If the details/player view is open, close it before going home
+    if (!detailsView.classList.contains("hidden")) {
+      saveFinalProgress();
+      setVideoPlayerSrc("");
+      currentMedia = null;
+      detailsView.classList.add("hidden");
+      mainView.classList.remove("hidden");
+      if (window.location.hash === "#details") {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
     loadHome();
   }
 });
@@ -95,6 +106,17 @@ animeModeBtn.addEventListener("click", () => {
     isAnimeMode = true;
     moviesModeBtn.classList.remove("active");
     animeModeBtn.classList.add("active");
+    // If the details/player view is open, close it before going home
+    if (!detailsView.classList.contains("hidden")) {
+      saveFinalProgress();
+      setVideoPlayerSrc("");
+      currentMedia = null;
+      detailsView.classList.add("hidden");
+      mainView.classList.remove("hidden");
+      if (window.location.hash === "#details") {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
     loadHome();
   }
 });
@@ -715,6 +737,9 @@ seasonSelect.addEventListener("change", () => {
 episodeSelect.addEventListener("change", () => {
   saveFinalProgress();
   if (currentMedia && currentMedia.type === "anime") {
+    // Show immediate feedback that loading has started
+    animeResolutionSelect.innerHTML = "<option>Loading...</option>";
+    setVideoPlayerSrc("");
     updateAnimePlayerSrc();
   } else {
     updatePlayerSrc();
@@ -810,33 +835,47 @@ async function loadAnimeEpisodes(session) {
   }
 }
 
+let animePlayerSrcToken = 0; // Used to cancel stale async calls
+
 async function updateAnimePlayerSrc() {
   if (!currentMedia || currentMedia.type !== "anime") return;
 
   const epSession = episodeSelect.value;
   if (!epSession || epSession.startsWith("No")) return;
 
-  setVideoPlayerSrc("");
+  // Increment token so any previous in-flight call becomes stale
+  const myToken = ++animePlayerSrcToken;
+
+  // Show loading state immediately
   animeResolutionSelect.innerHTML = "<option>Loading...</option>";
 
   const playData = await fetchData(
     `${ANIME_API_URL}/play/${currentMedia.session}?episodeId=${epSession}`,
   );
 
+  // If a newer call was made while we were waiting, discard this result
+  if (myToken !== animePlayerSrcToken) return;
+
   if (playData && playData.sources && playData.sources.length > 0) {
     currentAnimeSources = playData.sources;
+
+    // Deduplicate sources by resolution before populating dropdown
+    const seen = new Set();
+    const uniqueSources = currentAnimeSources.filter((source) => {
+      if (seen.has(source.resolution)) return false;
+      seen.add(source.resolution);
+      return true;
+    });
+    currentAnimeSources = uniqueSources;
+
     animeResolutionSelect.innerHTML = "";
 
-    const seenResolutions = new Set();
     // Populate resolution dropdown
     currentAnimeSources.forEach((source) => {
-      if (!seenResolutions.has(source.resolution)) {
-        seenResolutions.add(source.resolution);
-        const option = document.createElement("option");
-        option.value = source.resolution;
-        option.textContent = `${source.resolution}p`;
-        animeResolutionSelect.appendChild(option);
-      }
+      const option = document.createElement("option");
+      option.value = source.resolution;
+      option.textContent = `${source.resolution}p`;
+      animeResolutionSelect.appendChild(option);
     });
 
     // Find best resolution, defaulting to first
