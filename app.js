@@ -816,6 +816,9 @@ async function updateAnimePlayerSrc() {
   const epSession = episodeSelect.value;
   if (!epSession || epSession.startsWith("No")) return;
 
+  setVideoPlayerSrc("");
+  animeResolutionSelect.innerHTML = "<option>Loading...</option>";
+
   const playData = await fetchData(
     `${ANIME_API_URL}/play/${currentMedia.session}?episodeId=${epSession}`,
   );
@@ -824,12 +827,16 @@ async function updateAnimePlayerSrc() {
     currentAnimeSources = playData.sources;
     animeResolutionSelect.innerHTML = "";
 
+    const seenResolutions = new Set();
     // Populate resolution dropdown
     currentAnimeSources.forEach((source) => {
-      const option = document.createElement("option");
-      option.value = source.resolution;
-      option.textContent = `${source.resolution}p`;
-      animeResolutionSelect.appendChild(option);
+      if (!seenResolutions.has(source.resolution)) {
+        seenResolutions.add(source.resolution);
+        const option = document.createElement("option");
+        option.value = source.resolution;
+        option.textContent = `${source.resolution}p`;
+        animeResolutionSelect.appendChild(option);
+      }
     });
 
     // Find best resolution, defaulting to first
